@@ -1,34 +1,33 @@
-import os, openai
-from flask import Flask
-from threading import Thread
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+import os
+import openai
+import telegram
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
-# خادم Replit صغير لإبقاء البوت نشط
-app = Flask('')
-@app.route('/')
-def home():
-    return "🤖 Bot is alive!"
-Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080))), daemon=True).start()
+openai.api_key = os.environ["OPENAI_API_KEY"]
+bot_token = os.environ["TELEGRAM_BOT_TOKEN"]
 
-# مفاتيح السر
-openai.api_key = os.environ['OPENAI_API_KEY']
-TELEGRAM_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
+def start(update, context):
+    update.message.reply_text("مرحباً! أرسل لي أي سؤال وسأجيبك.")
 
-# /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("مرحباً! أرسل لي أي سؤال وسأجيبك.")
-
-# الرد على النص
-async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    prompt = update.message.text
-    reply = openai.ChatCompletion.create(
+def chat(update, context):
+    user_input = update.message.text
+    response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    ).choices[0].message.content
-    await update.message.reply_text(reply)
+        messages=[
+            {"role": "system", "content": "أنت مساعدة ذكية اسمك ليانا، تتحدثين بطريقة أنثوية لبقة، وتردين بحرية واحترام، وتختارين الرد المناسب لكل موقف."},
+            {"role": "user", "content": user_input}
+        ]
+    )
+    reply = response["choices"][0]["message"]["content"]
+    update.message.reply_text(reply)
 
-bot = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-bot.add_handler(CommandHandler("start", start))
-bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
-bot.run_polling()
+def main():
+    updater = Updater(bot_token, use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, chat))
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == "__main__":
+    main()
