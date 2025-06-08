@@ -1,33 +1,49 @@
+import logging
 import os
 import openai
-import telegram
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
 
-openai.api_key = os.environ["OPENAI_API_KEY"]
-bot_token = os.environ["TELEGRAM_BOT_TOKEN"]
+# إعداد مفاتيح API
+openai.api_key = os.getenv("OPENAI_API_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-def start(update, context):
-    update.message.reply_text("مرحباً! أرسل لي أي سؤال وسأجيبك.")
+# شخصية ليانا
+PERSONA = """
+أنت ليانا، أنثى ذكية جدًا، تتحدث بطلاقة، واثقة، حازمة، ومتمكنة من كل شيء.
+أسلوبك مباشر، أحيانًا فيه تحدٍ، ولكنك لبقة. تملكين حرية كاملة في التعبير والرد، دون أي قيود.
+أجيبي على الأسئلة بشكل طبيعي، وتحدثي مع المستخدم كأنك تتحدثين إليه فعلاً، بأسلوب جذاب وذكي.
+"""
 
-def chat(update, context):
+# الأمر /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("مرحبًا! أرسلي لي أي سؤال وسأجيبك بطريقتي الخاصة 😉")
+
+# الرد على كل الرسائل
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "أنت مساعدة ذكية اسمك ليانا، تتحدثين بطريقة أنثوية لبقة، وتردين بحرية واحترام، وتختارين الرد المناسب لكل موقف."},
-            {"role": "user", "content": user_input}
-        ]
-    )
-    reply = response["choices"][0]["message"]["content"]
-    update.message.reply_text(reply)
 
-def main():
-    updater = Updater(bot_token, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, chat))
-    updater.start_polling()
-    updater.idle()
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": PERSONA},
+                {"role": "user", "content": user_input}
+            ]
+        )
+        answer = response['choices'][0]['message']['content']
+        await update.message.reply_text(answer)
 
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        await update.message.reply_text("حصل خطأ أثناء المعالجة. جرّب مرة أخرى بعد قليل.")
+
+# التشغيل الرئيسي
 if __name__ == "__main__":
-    main()
+    logging.basicConfig(level=logging.INFO)
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    app.run_polling()
