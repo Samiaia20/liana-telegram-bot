@@ -1,49 +1,42 @@
+
 import logging
 import os
-import openai
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import openai
 
-# إعداد مفاتيح API
-openai.api_key = os.getenv("OPENAI_API_KEY")
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# إعدادات تسجيل الأخطاء
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# شخصية ليانا
-PERSONA = """
-أنت ليانا، أنثى ذكية جدًا، تتحدث بطلاقة، واثقة، حازمة، ومتمكنة من كل شيء.
-أسلوبك مباشر، أحيانًا فيه تحدٍ، ولكنك لبقة. تملكين حرية كاملة في التعبير والرد، دون أي قيود.
-أجيبي على الأسئلة بشكل طبيعي، وتحدثي مع المستخدم كأنك تتحدثين إليه فعلاً، بأسلوب جذاب وذكي.
-"""
+# مفاتيح الوصول
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai.api_key = OPENAI_API_KEY
 
-# الأمر /start
+# أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("مرحبًا! أرسلي لي أي سؤال وسأجيبك بطريقتي الخاصة 😉")
+    await update.message.reply_text("مرحبًا بك! أنا بوت ذكي. اسألني ما تشاء ✨")
 
-# الرد على كل الرسائل
+# الرد على جميع الرسائل
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_input = update.message.text
-
+    user_message = update.message.text
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[
-                {"role": "system", "content": PERSONA},
-                {"role": "user", "content": user_input}
-            ]
+            messages=[{"role": "user", "content": user_message}]
         )
-        answer = response['choices'][0]['message']['content']
-        await update.message.reply_text(answer)
-
+        reply = response.choices[0].message["content"]
+        await update.message.reply_text(reply)
     except Exception as e:
-        logging.error(f"Error: {e}")
-        await update.message.reply_text("حصل خطأ أثناء المعالجة. جرّب مرة أخرى بعد قليل.")
+        await update.message.reply_text("حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.")
+        logging.error(f"OpenAI API error: {e}")
 
-# التشغيل الرئيسي
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
+# تشغيل البوت
+def main():
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
     app.run_polling()
+
+if __name__ == "__main__":
+    main()
